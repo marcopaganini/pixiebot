@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"github.com/golang/glog"
@@ -95,7 +94,7 @@ func sendPhoto(bot tgbotInterface, chatID int64, mediaURL string) error {
 	photoMsg.UseExisting = true
 
 	glog.Infof("Sending %v\n", photoMsg)
-	retmsg, err := bot.Send(photoMsg)
+	_, err := bot.Send(photoMsg)
 	if err != nil {
 		return fmt.Errorf("error sending photo (url: %s): %v", mediaURL, err)
 	}
