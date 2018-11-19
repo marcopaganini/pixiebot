@@ -17,6 +17,15 @@ const (
 	botConfigDir = "pixiebot"
 )
 
+type ConfigTrigger struct {
+	Subreddit  string   `toml:"subreddit"`
+	Keywords   []string `toml:"keywords"`
+	Percentage int      `toml:"percentage"`
+	WaitSec    int      `toml:"waitsec"`
+}
+
+type ConfigTriggers map[string]ConfigTrigger
+
 type botConfig struct {
 	// Credentials
 	Username string `toml:"username"`
@@ -26,6 +35,9 @@ type botConfig struct {
 
 	// Telegram Token
 	Token string `toml:"token"`
+
+	// Triggers with subreddit as the key.
+	Triggers ConfigTriggers `toml:"triggers"`
 }
 
 // loadConfig loads the configuration items for the bot from 'configFile' under

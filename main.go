@@ -41,11 +41,11 @@ func main() {
 	// run bot (this should never exit).
 	bot.Debug = true
 	glog.Infof("Authorized on account %s", bot.Self.UserName)
-	run(bot, rclient)
+	run(bot, rclient, config.Triggers)
 }
 
 // run is the main message dispatcher for the bot.
-func run(bot tgbotInterface, rclient redditClientInterface) {
+func run(bot tgbotInterface, rclient redditClientInterface, triggers ConfigTriggers) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -53,23 +53,24 @@ func run(bot tgbotInterface, rclient redditClientInterface) {
 	for update := range updates {
 		// Check trigger messages.
 		if update.Message != nil {
-			handleTriggers(bot, update, rclient)
+			handleTriggers(bot, update, rclient, triggers)
 		}
 	}
 }
 
 // handleTriggers checks if the message is a trigger message and emits a picture
 // from the configured subreddit if so.
-func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditClientInterface) {
+func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditClientInterface, triggers ConfigTriggers) {
 	msg := strings.ToLower(update.Message.Text)
 	glog.Infof("Checking %q", msg)
-	if !strings.Contains(msg, "aww") {
-		glog.Infof("Does not contain our keyword")
+	subreddit, _, ok := checkTriggers(msg, triggers)
+	if !ok {
 		return
 	}
+	glog.Infof("Triggering fetch on %s", subreddit)
 
 	// Get a random picture URL and download into a temporary file.
-	mediaURL, err := rclient.RandomPicURL("aww")
+	mediaURL, err := rclient.RandomPicURL(subreddit)
 	if err != nil {
 		glog.Errorf("%v", err)
 		return
@@ -99,4 +100,17 @@ func sendPhoto(bot tgbotInterface, chatID int64, mediaURL string) error {
 		return fmt.Errorf("error sending photo (url: %s): %v", mediaURL, err)
 	}
 	return nil
+}
+
+// checkTriggers returns the name of a subreddit if the current message matches any of the
+// trigger messages configured for that subreddit.
+func checkTriggers(msg string, triggers ConfigTriggers) (string, ConfigTrigger, bool) {
+	for subreddit, trigger := range triggers {
+		for _, w := range trigger.Keywords {
+			if strings.Contains(msg, w) {
+				return subreddit, trigger, true
+			}
+		}
+	}
+	return "", ConfigTrigger{}, false
 }
