@@ -17,7 +17,7 @@ type tgbotInterface interface {
 
 // redditClientInterface defines an interface between this bot and the reddit package.
 type redditClientInterface interface {
-	RandomPicURL(string) (string, error)
+	RandomMediaURL(string) (string, int, error)
 }
 
 func main() {
@@ -69,36 +69,85 @@ func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditCl
 	}
 	glog.Infof("Triggering fetch on %s", subreddit)
 
-	// Get a random picture URL and download into a temporary file.
-	mediaURL, err := rclient.RandomPicURL(subreddit)
+	mediaURL, mediaType, err := rclient.RandomMediaURL(subreddit)
 	if err != nil {
 		glog.Errorf("%v", err)
 		return
 	}
-	if mediaURL == "" {
+	switch mediaType {
+	// Nothing to send
+	case reddit.MediaNone:
 		glog.Infof("Media URL is empty. Silently ignoring.")
-		return
-	}
-	if err := sendPhoto(bot, update.Message.Chat.ID, mediaURL); err != nil {
-		glog.Info(err)
-	}
 
+	// MediaImageURL: The URL points to an image, so we can upload a
+	// picture directly.
+	case reddit.MediaImageURL:
+		if err := sendImageURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
+			glog.Info(err)
+		}
+	// MediaFileURL: The URL points to a file (typically an MP4 file, but any
+	// type playable by Telegram. In this case, we send the URL as a document.
+	// upload.
+	case reddit.MediaFileURL:
+		if err := sendFileURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
+			glog.Info(err)
+		}
+	// Video URL: Simple video url, like youtube. Telegram takes charge of
+	// reading the link and generating a thumbnail.
+	case reddit.MediaVideoURL:
+		if err := sendURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
+			glog.Info(err)
+		}
+	}
 	return
 }
 
-// sendPhoto sends a photo pointed to by mediaURL to the telegram chat identified by chatID.
-func sendPhoto(bot tgbotInterface, chatID int64, mediaURL string) error {
+// sendImageURL sends a photo pointed to by mediaURL to the telegram chat
+// identified by chatID using NewPhotoUpload. This is the ideal way to
+// send URLs that point directly to images, which will immediately show
+// in the group.
+func sendImageURL(bot tgbotInterface, chatID int64, mediaURL string) error {
 	// Issue #74 is at play here, preventing us to upload via url.URL:
 	// https://github.com/go-telegram-bot-api/telegram-bot-api/issues/74
-	photoMsg := tgbotapi.NewPhotoUpload(chatID, nil)
-	photoMsg.FileID = mediaURL
-	photoMsg.UseExisting = true
+	img := tgbotapi.NewPhotoUpload(chatID, nil)
+	img.FileID = mediaURL
+	img.UseExisting = true
 
-	glog.Infof("Sending %v\n", photoMsg)
-	_, err := bot.Send(photoMsg)
+	glog.Infof("Sending Image URL: %v\n", img)
+	_, err := bot.Send(img)
 	if err != nil {
 		return fmt.Errorf("error sending photo (url: %s): %v", mediaURL, err)
 	}
+	return nil
+}
+
+// sendURL sends the media URL as a regular message to the user/group.
+func sendURL(bot tgbotInterface, chatID int64, mediaURL string) error {
+	msg := tgbotapi.NewMessage(chatID, mediaURL)
+
+	glog.Infof("Sending URL: %v\n", msg)
+	_, err := bot.Send(msg)
+	if err != nil {
+		return fmt.Errorf("error sending media URL (url: %s): %v", mediaURL, err)
+	}
+
+	return nil
+}
+
+// sendFileURL sends the media URL that points to a Telegram playable file
+// (usually an MP4 video) using NewDocumentUpload. Use sendPhoto instead if
+// the URL points directly to an image.
+func sendFileURL(bot tgbotInterface, chatID int64, mediaURL string) error {
+	doc := tgbotapi.NewDocumentUpload(chatID, nil)
+	doc.FileID = mediaURL
+	doc.UseExisting = true
+
+	glog.Infof("Sending File URL: %v\n", doc)
+	_, err := bot.Send(doc)
+	if err != nil {
+		return fmt.Errorf("error sending file URL (url: %s): %v", mediaURL, err)
+	}
+
 	return nil
 }
 
