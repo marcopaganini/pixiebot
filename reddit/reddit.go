@@ -163,6 +163,13 @@ func media(data []byte) (string, int, error) {
 		return html.UnescapeString(u), MediaFileURL, nil
 	}
 
+	// Posts with a data.url ending in gif or gifv.
+	u, err = jsonparser.GetString(rdata, "url")
+	if strings.HasSuffix(u, "gif") || strings.HasSuffix(u, "gifv") {
+		glog.Infof("Returning GIF/GIFv URL")
+		return html.UnescapeString(u), MediaImageURL, nil
+	}
+
 	// At this point, we check for regular preview images.
 	u, err = jsonparser.GetString(rdata, "preview", "images", "[0]", "source", "url")
 	if err != nil {
