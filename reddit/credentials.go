@@ -24,6 +24,9 @@ type Token struct {
 	TokenType   string `json:"token_type"`
 	ExpiresIn   int    `json:"expires_in"`
 	Scope       string `json:"scope"`
+
+	// Token creation time.
+	ctime time.Time
 }
 
 // Credentials holds all state require to authenticate a reddit request.
@@ -33,9 +36,6 @@ type Credentials struct {
 	password     string
 	clientID     string
 	clientSecret string
-
-	// Token creation time.
-	ctime time.Time
 
 	// Reddit auth URL.
 	tokenURL string
@@ -59,17 +59,8 @@ func (c *Credentials) RefreshToken() error {
 	}
 
 	// Do we need a new token?
-	if c.token != nil {
-		// New expiration time. We remove 30 seconds to give the caller
-		// some time with a valid token.
-		exp := c.ctime.Add(time.Duration(c.token.ExpiresIn) * time.Second)
-		exp = exp.Add(-30 * time.Second)
-
-		now := time.Now()
-		if now.Before(exp) {
-			glog.Infof("Token still valid: now: %v, expires: %v", time.Now(), exp)
-			return nil
-		}
+	if validToken(c.token) {
+		return nil
 	}
 
 	client := &http.Client{}
@@ -108,8 +99,8 @@ func (c *Credentials) RefreshToken() error {
 
 		// Overloaded?
 		if resp.StatusCode == http.StatusTooManyRequests {
-			d := time.Duration((1 << try) * time.Second)
-			glog.Infof("Server too busy. Will retry in %v", d)
+			d := time.Duration(1<<try) * time.Second
+			glog.Infof("Server busy. Will retry in %v", d)
 			time.Sleep(d)
 			continue
 		}
@@ -130,7 +121,7 @@ func (c *Credentials) RefreshToken() error {
 		return fmt.Errorf("unable to decode reddit auth token: %v", err)
 	}
 	// Set token last updated time.
-	c.ctime = time.Now()
+	c.token.ctime = time.Now()
 
 	return nil
 }
@@ -141,4 +132,24 @@ func (c *Credentials) Token() (*Token, error) {
 		return nil, err
 	}
 	return c.token, nil
+}
+
+// validToken returns true if token is still valid. False otherwise.
+func validToken(token *Token) bool {
+	// Non-initialized token == invalid token.
+	if token == nil {
+		return false
+	}
+
+	// New expiration time. We remove 30 seconds to give the caller
+	// some time with a valid token.
+	exp := token.ctime.Add(time.Duration(token.ExpiresIn) * time.Second)
+	exp = exp.Add(-30 * time.Second)
+
+	now := time.Now()
+	if now.Before(exp) {
+		glog.Infof("Token still valid: now: %v, expires: %v", time.Now(), exp)
+		return true
+	}
+	return false
 }

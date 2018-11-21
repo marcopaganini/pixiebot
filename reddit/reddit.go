@@ -15,7 +15,7 @@ import (
 const (
 	// redditRandomArticleURL contains the default format for a reddit URL
 	// used to fetch a random article from a subreddit.
-	kRandomArticleURL = "http://oauth.reddit.com/r/%s/random.json"
+	randomArticleURLFormat = "http://oauth.reddit.com/r/%s/random.json"
 
 	// Custom user-agent is recommended by reddit.
 	// Most default UAs are heavily throttled.
@@ -53,7 +53,7 @@ type CredentialsInterface interface {
 func NewClient(username, password, clientID, clientSecret string) *Client {
 	return &Client{
 		cred:             NewCredentials(username, password, clientID, clientSecret),
-		randomArticleURL: kRandomArticleURL,
+		randomArticleURL: randomArticleURLFormat,
 	}
 }
 
@@ -148,7 +148,8 @@ func media(data []byte) (string, int, error) {
 	if err == nil {
 		if dtype == "youtube.com" || dtype == "gfycat.com" {
 			glog.Infof("Returning media type: %s", dtype)
-			u, err := jsonparser.GetString(rdata, "url")
+			var u string
+			u, err = jsonparser.GetString(rdata, "url")
 			return html.UnescapeString(u), MediaVideoURL, err
 		}
 	}
@@ -164,7 +165,7 @@ func media(data []byte) (string, int, error) {
 	}
 
 	// Posts with a data.url ending in gif or gifv.
-	u, err = jsonparser.GetString(rdata, "url")
+	u, _ = jsonparser.GetString(rdata, "url")
 	if strings.HasSuffix(u, "gif") || strings.HasSuffix(u, "gifv") {
 		glog.Infof("Returning GIF/GIFv URL")
 		return html.UnescapeString(u), MediaImageURL, nil
