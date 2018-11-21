@@ -173,7 +173,7 @@ func media(data []byte) (string, int, error) {
 	// At this point, we check for regular preview images.
 	u, err = jsonparser.GetString(rdata, "preview", "images", "[0]", "source", "url")
 	if err != nil {
-		glog.Infof("Can't find 'preview' in json: %v", err)
+		glog.Infof("Can't find 'preview' in json")
 		return "", MediaNone, nil
 	}
 	imgURL := html.UnescapeString(u)
