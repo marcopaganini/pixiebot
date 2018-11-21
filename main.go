@@ -6,7 +6,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/marcopaganini/pixiebot/reddit"
 	"gopkg.in/telegram-bot-api.v4"
-	"strings"
+	"math/rand"
+	//"github.com/davecgh/go-spew/spew"
 )
 
 // tgbotInterface defines an interface between this bot and the telegram API.
@@ -41,11 +42,11 @@ func main() {
 	// run bot (this should never exit).
 	bot.Debug = true
 	glog.Infof("Authorized on account %s", bot.Self.UserName)
-	run(bot, rclient, config.Triggers)
+	run(bot, rclient, config.triggerConfig)
 }
 
 // run is the main message dispatcher for the bot.
-func run(bot tgbotInterface, rclient redditClientInterface, triggers ConfigTriggers) {
+func run(bot tgbotInterface, rclient redditClientInterface, triggers TriggerConfig) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -60,10 +61,15 @@ func run(bot tgbotInterface, rclient redditClientInterface, triggers ConfigTrigg
 
 // handleTriggers checks if the message is a trigger message and emits a picture
 // from the configured subreddit if so.
-func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditClientInterface, triggers ConfigTriggers) {
-	msg := strings.ToLower(update.Message.Text)
+func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditClientInterface, triggers TriggerConfig) {
+	msg := update.Message.Text
 	glog.Infof("Checking %q", msg)
-	subreddit, _, ok := checkTriggers(msg, triggers)
+
+	subreddit, ok, err := checkTriggers(msg, triggers)
+	if err != nil {
+		glog.Errorf("Error checking triggers: %v", err)
+		return
+	}
 	if !ok {
 		return
 	}
@@ -153,13 +159,19 @@ func sendFileURL(bot tgbotInterface, chatID int64, mediaURL string) error {
 
 // checkTriggers returns the name of a subreddit if the current message matches any of the
 // trigger messages configured for that subreddit.
-func checkTriggers(msg string, triggers ConfigTriggers) (string, ConfigTrigger, bool) {
-	for subreddit, trigger := range triggers {
-		for _, w := range trigger.Keywords {
-			if strings.Contains(msg, w) {
-				return subreddit, trigger, true
-			}
+func checkTriggers(msg string, triggers TriggerConfig) (string, bool, error) {
+	for _, rule := range triggers {
+		// Attempt to match regexp.
+		if !rule.regex.MatchString(msg) {
+			continue
 		}
+		// Throw dice on percentage.
+		rnd := (rand.Int() % 100) + 1
+		if rule.percentage <= rnd {
+			glog.Infof("No dice for subreddit %s! Wanted [1-%d], got %d\n", rule.subreddit, rule.percentage, rnd)
+			continue
+		}
+		return rule.subreddit, true, nil
 	}
-	return "", ConfigTrigger{}, false
+	return "", false, nil
 }

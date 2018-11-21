@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 )
 
 const (
@@ -17,15 +18,26 @@ const (
 	botConfigDir = "pixiebot"
 )
 
-type ConfigTrigger struct {
-	Subreddit  string   `toml:"subreddit"`
-	Keywords   []string `toml:"keywords"`
-	Percentage int      `toml:"percentage"`
-	WaitSec    int      `toml:"waitsec"`
+// TOMLTriggerRule represents a configuration map in TOML.
+type TOMLTriggerRule struct {
+	Subreddit  string `toml:"subreddit"`
+	Regex      string `toml:"regex"`
+	Percentage int    `toml:"percentage"`
 }
 
-type ConfigTriggers map[string]ConfigTrigger
+// TOMLTriggerConfig is a map of TOML trigger configs.
+type TOMLTriggerConfig map[string]TOMLTriggerRule
 
+// TriggerConfig stores the in-memory (parsed & sanitized) trigger config.
+type TriggerRule struct {
+	subreddit  string
+	regex      *regexp.Regexp
+	percentage int
+}
+
+type TriggerConfig []TriggerRule
+
+// botConfig stores configuration about this bot instance.
 type botConfig struct {
 	// Credentials
 	Username string `toml:"username"`
@@ -36,12 +48,16 @@ type botConfig struct {
 	// Telegram Token
 	Token string `toml:"token"`
 
-	// Triggers with subreddit as the key.
-	Triggers ConfigTriggers `toml:"triggers"`
+	// Trigger config as represented in the TOML file.
+	TOMLTriggerConfig TOMLTriggerConfig `toml:"triggers"`
+
+	// Parsed and sanitized trigger config.
+	triggerConfig TriggerConfig
 }
 
 // loadConfig loads the configuration items for the bot from 'configFile' under
-// the home directory, and assigns sane defaults to certain configuration items.
+// the home directory, and assigns sane defaults to certain configuration
+// items.  Returns a filled-in botConfig object.
 func loadConfig() (botConfig, error) {
 	config := botConfig{}
 
@@ -63,6 +79,38 @@ func loadConfig() (botConfig, error) {
 	if config.Username == "" || config.Password == "" || config.ClientID == "" || config.Secret == "" {
 		return botConfig{}, errors.New("usename/password/client_id/secret cannot be null")
 	}
+
+	// Generate triggerConfig.
+	// First, fetch every key and order. We want keys to be processed in sequence.
+	var keys []string
+
+	for k := range config.TOMLTriggerConfig {
+		keys = append(keys, k)
+	}
+
+	// Now add multiple trigger configs in key order.
+	tc := TriggerConfig{}
+	for _, k := range keys {
+		fileRule := config.TOMLTriggerConfig[k]
+
+		// Check percentage.
+		if fileRule.Percentage < 0 || fileRule.Percentage > 100 {
+			return botConfig{}, fmt.Errorf("trigger percentage must be between 0 and 100, got %d", fileRule.Percentage)
+		}
+
+		tr := TriggerRule{}
+		tr.subreddit = fileRule.Subreddit
+		tr.percentage = fileRule.Percentage
+
+		// Convert regex to a compiled object for later use.
+		var err error
+		tr.regex, err = regexp.Compile(fileRule.Regex)
+		if err != nil {
+			return botConfig{}, fmt.Errorf("rule contains invalid regex: %q: %v", fileRule.Regex, err)
+		}
+		tc = append(tc, tr)
+	}
+	config.triggerConfig = tc
 
 	return config, nil
 }
