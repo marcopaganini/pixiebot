@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"github.com/marcopaganini/pixiebot/reddit"
 	"gopkg.in/telegram-bot-api.v4"
+	"log"
 	"math/rand"
 	//"github.com/davecgh/go-spew/spew"
 )
@@ -41,42 +41,42 @@ func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditCl
 
 	subreddit, ok, err := checkTriggers(msg, triggers)
 	if err != nil {
-		glog.Errorf("Error checking triggers: %v", err)
+		log.Printf("Error checking triggers: %v", err)
 		return
 	}
 	if !ok {
 		return
 	}
-	glog.Infof("Triggering fetch on %s", subreddit)
+	log.Printf("Triggering fetch on %s", subreddit)
 
 	mediaURL, mediaType, err := rclient.RandomMediaURL(subreddit)
 	if err != nil {
-		glog.Errorf("%v", err)
+		log.Printf("%v", err)
 		return
 	}
 	switch mediaType {
 	// Nothing to send
 	case reddit.MediaNone:
-		glog.Infof("Media URL is empty. Silently ignoring.")
+		log.Printf("Media URL is empty. Silently ignoring.")
 
 	// MediaImageURL: The URL points to an image, so we can upload a
 	// picture directly.
 	case reddit.MediaImageURL:
 		if err := sendImageURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
-			glog.Info(err)
+			log.Print(err)
 		}
 	// MediaFileURL: The URL points to a file (typically an MP4 file, but any
 	// type playable by Telegram. In this case, we send the URL as a document.
 	// upload.
 	case reddit.MediaFileURL:
 		if err := sendFileURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
-			glog.Info(err)
+			log.Print(err)
 		}
 	// Video URL: Simple video url, like youtube. Telegram takes charge of
 	// reading the link and generating a thumbnail.
 	case reddit.MediaVideoURL:
 		if err := sendURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
-			glog.Info(err)
+			log.Print(err)
 		}
 	}
 	return
@@ -93,7 +93,7 @@ func sendImageURL(bot tgbotInterface, chatID int64, mediaURL string) error {
 	img.FileID = mediaURL
 	img.UseExisting = true
 
-	glog.Infof("Sending Image URL: %v\n", img)
+	log.Printf("Sending Image URL: %v\n", img)
 	_, err := bot.Send(img)
 	if err != nil {
 		return fmt.Errorf("error sending photo (url: %s): %v", mediaURL, err)
@@ -105,7 +105,7 @@ func sendImageURL(bot tgbotInterface, chatID int64, mediaURL string) error {
 func sendURL(bot tgbotInterface, chatID int64, mediaURL string) error {
 	msg := tgbotapi.NewMessage(chatID, mediaURL)
 
-	glog.Infof("Sending URL: %v\n", msg)
+	log.Printf("Sending URL: %v\n", msg)
 	_, err := bot.Send(msg)
 	if err != nil {
 		return fmt.Errorf("error sending media URL (url: %s): %v", mediaURL, err)
@@ -122,7 +122,7 @@ func sendFileURL(bot tgbotInterface, chatID int64, mediaURL string) error {
 	doc.FileID = mediaURL
 	doc.UseExisting = true
 
-	glog.Infof("Sending File URL: %v\n", doc)
+	log.Printf("Sending File URL: %v\n", doc)
 	_, err := bot.Send(doc)
 	if err != nil {
 		return fmt.Errorf("error sending file URL (url: %s): %v", mediaURL, err)
@@ -142,7 +142,7 @@ func checkTriggers(msg string, triggers TriggerConfig) (string, bool, error) {
 		// Throw dice on percentage.
 		rnd := (rand.Int() % 100) + 1
 		if rule.percentage <= rnd {
-			glog.Infof("No dice for subreddit %s! Wanted [1-%d], got %d\n", rule.subreddit, rule.percentage, rnd)
+			log.Printf("No dice for subreddit %s! Wanted [1-%d], got %d\n", rule.subreddit, rule.percentage, rnd)
 			continue
 		}
 		return rule.subreddit, true, nil

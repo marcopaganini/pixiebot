@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -100,7 +100,7 @@ func (c *Credentials) RefreshToken() error {
 		// Overloaded?
 		if resp.StatusCode == http.StatusTooManyRequests {
 			d := time.Duration(1<<try) * time.Second
-			glog.Infof("Server busy. Will retry in %v", d)
+			log.Printf("Server busy. Will retry in %v", d)
 			time.Sleep(d)
 			continue
 		}
@@ -148,7 +148,7 @@ func validToken(token *Token) bool {
 
 	now := time.Now()
 	if now.Before(exp) {
-		glog.Infof("Token still valid: now: %v, expires: %v", time.Now(), exp)
+		log.Printf("Token still valid: now: %v, expires: %v", time.Now(), exp)
 		return true
 	}
 	return false

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/buger/jsonparser"
-	"github.com/golang/glog"
 	"html"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -147,7 +147,7 @@ func media(data []byte) (string, int, error) {
 	dtype, err := jsonparser.GetString(rdata, "media", "type")
 	if err == nil {
 		if dtype == "youtube.com" || dtype == "gfycat.com" {
-			glog.Infof("Returning media type: %s", dtype)
+			log.Printf("Returning media type: %s", dtype)
 			var u string
 			u, err = jsonparser.GetString(rdata, "url")
 			return html.UnescapeString(u), MediaVideoURL, err
@@ -160,24 +160,24 @@ func media(data []byte) (string, int, error) {
 	// client to use NewDocument when posting this link).
 	u, err := jsonparser.GetString(rdata, "media", "reddit_video", "fallback_url")
 	if err == nil {
-		glog.Infof("Returning a data.media.fallback_url (reddit_video)")
+		log.Printf("Returning a data.media.fallback_url (reddit_video)")
 		return html.UnescapeString(u), MediaFileURL, nil
 	}
 
 	// Posts with a data.url ending in gif or gifv.
 	u, _ = jsonparser.GetString(rdata, "url")
 	if strings.HasSuffix(u, "gif") || strings.HasSuffix(u, "gifv") {
-		glog.Infof("Returning GIF/GIFv URL")
+		log.Printf("Returning GIF/GIFv URL")
 		return html.UnescapeString(u), MediaImageURL, nil
 	}
 
 	// At this point, we check for regular preview images.
 	u, err = jsonparser.GetString(rdata, "preview", "images", "[0]", "source", "url")
 	if err != nil {
-		glog.Infof("Can't find 'preview' in json")
+		log.Printf("Can't find 'preview' in json")
 		return "", MediaNone, nil
 	}
 	imgURL := html.UnescapeString(u)
-	glog.Infof("Plain image preview URL: %s", imgURL)
+	log.Printf("Plain image preview URL: %s", imgURL)
 	return imgURL, MediaImageURL, nil
 }
