@@ -38,7 +38,6 @@ func run(bot tgbotInterface, rclient redditClientInterface, triggers TriggerConf
 // from the configured subreddit if so.
 func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditClientInterface, triggers TriggerConfig) {
 	msg := update.Message.Text
-	glog.Infof("Checking %q", msg)
 
 	subreddit, ok, err := checkTriggers(msg, triggers)
 	if err != nil {
