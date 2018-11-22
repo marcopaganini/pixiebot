@@ -1,0 +1,70 @@
+# PixieBot configuration file.
+#
+# This file should go in $HOME/.config/pixiebot/config.toml.  Make sure to edit
+# the file and put your credentials here.  It's also a good idea to protect
+# this file since it contains your bot's reddit and telegram credentials.
+
+# Reddit Credentials.
+# Make sure your reddit credentials are correct.
+
+# Reddit username & password
+username = "<your bot's reddit username>"
+password = "<your bot's reddit password>"
+
+# Make sure to create a reddit app at https://www.reddit.com/prefs/apps
+# Simple instructions on how to create your reddit app:
+# https://github.com/reddit-archive/reddit/wiki/OAuth2
+# Enter your reddit app client_id and secret here.
+client_id = "<your reddit app client ID>"
+secret = "<your reddit app secret>"
+
+# Telegram bot token, obtained by creating a bot with BotFather at
+# http://t.me/BotFather. Once your bot is created, edit your bot settings and
+# make sure "Group Privacy" is set to "disabled" (default is enabled). With the
+# default, the bot won't be able to read other people's messages in the group.
+token = "<your bot token goes here>"
+
+# Triggers specify regular expressions to match on the group messages and the
+# subreddit to pick a random keyword/video to send to the channel.  The keys
+# below [triggers.1], [triggers.2], etc... are evaluated in order. It's
+# possible to name them anything, as long as they have the prefix "trigger."
+#
+# The percentage field defines the chance of this particular rule triggering
+# once the regular expression matches. If a rule triggers (regexp match &
+# percentage), no other rules will match for this message.
+[triggers]
+  # 30% of chances of fetching something from /r/aww if one of the keywords
+  # defined in the regular expressions match. Whole words only (\b), case
+  # insensitive (?i).
+  [triggers.1]
+  subreddit = "aww"
+  regex = '(?i)\b(sweet|nice|cat|dog|aww)\b'
+  percentage = 30
+
+  # We can specify the same keywords, but this time we'll have a 90% chance of
+  # matching. If a message contains "cat" (for example) and no rule in the
+  # previous triggers matches it, it will match at 90% here. This works as a
+  # fallback.
+  [triggers.2]
+  subreddit = "catpics"
+  regex = '(?i)\b(cat|cats|felines|meow|kitten|kitties)\b'
+  percentage = 90
+
+  [triggers.3]
+  subreddit = "catvideos"
+  regex = '(?i)\bcat video\b'
+  percentage = 20
+
+  # You can also use very low percentages to confuse people. :) If cat does not
+  # match anywhere else, it will match here 5% of the time with interesting
+  # results. :)
+  [triggers.4]
+  subreddit = "dogvideos"
+  regex = '(?i)\bcat\b'
+  percentage = 5
+
+  # Want to trigger on all messages, but only at 1% of the time?
+  [triggers.5]
+  subreddit = "earthporn"
+  regex = '.'
+  percentage = 1
