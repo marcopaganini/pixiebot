@@ -6,7 +6,16 @@ import (
 	"gopkg.in/telegram-bot-api.v4"
 	"log"
 	"math/rand"
+	"time"
 	//"github.com/davecgh/go-spew/spew"
+)
+
+const (
+	// Default sleep period.
+	sleepTime = time.Hour
+
+	// Default time format.
+	timeFormat = "2006-01-02 15:04:05 MST"
 )
 
 // tgbotInterface defines an interface between this bot and the telegram API.
@@ -20,18 +29,55 @@ type redditClientInterface interface {
 	RandomMediaURL(string) (string, int, error)
 }
 
+// botSleepTime keeps the time of the last request for the bot to sleep, per group.
+type botSleepTime map[int64]time.Time
+
 // run is the main message dispatcher for the bot.
 func run(bot tgbotInterface, rclient redditClientInterface, triggers TriggerConfig) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
+	bsleep := botSleepTime{}
 
 	updates, _ := bot.GetUpdatesChan(u)
 	for update := range updates {
-		// Check trigger messages.
-		if update.Message != nil {
-			handleTriggers(bot, update, rclient, triggers)
+		if update.Message == nil || update.Message.From.IsBot {
+			continue
 		}
+
+		chatID := update.Message.Chat.ID
+
+		if update.Message.IsCommand() {
+			msg := tgbotapi.NewMessage(chatID, "")
+
+			switch update.Message.Command() {
+			case "sleep":
+				wake := time.Now().Add(sleepTime)
+				bsleep[chatID] = wake
+				msg.Text = fmt.Sprintf("Sleeping until %s. Zzzzz...", wake.Format(timeFormat))
+			case "wakeup":
+				bsleep[chatID] = time.Now().Add(time.Minute * -1)
+				msg.Text = "Fully awake and ready to serve!"
+			default:
+				continue
+			}
+			bot.Send(msg)
+			continue
+		}
+
+		if sleeping(bsleep, chatID) {
+			continue
+		}
+
+		handleTriggers(bot, update, rclient, triggers)
 	}
+}
+
+// sleeping returns true if the bot is still sleeping, false otherwise.
+func sleeping(bsleep botSleepTime, id int64) bool {
+	if t, ok := bsleep[id]; ok && time.Now().Before(t) {
+		return true
+	}
+	return false
 }
 
 // handleTriggers checks if the message is a trigger message and emits a picture
@@ -79,7 +125,6 @@ func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditCl
 			log.Print(err)
 		}
 	}
-	return
 }
 
 // sendImageURL sends a photo pointed to by mediaURL to the telegram chat

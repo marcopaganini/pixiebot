@@ -28,13 +28,14 @@ type TOMLTriggerRule struct {
 // TOMLTriggerConfig is a map of TOML trigger configs.
 type TOMLTriggerConfig map[string]TOMLTriggerRule
 
-// TriggerConfig stores the in-memory (parsed & sanitized) trigger config.
+// TriggerRule stores the in-memory (parsed & sanitized) trigger config.
 type TriggerRule struct {
 	subreddit  string
 	regex      *regexp.Regexp
 	percentage int
 }
 
+// TriggerConfig holds a collection of trigger rules.
 type TriggerConfig []TriggerRule
 
 // botConfig stores configuration about this bot instance.
@@ -151,23 +152,4 @@ func configDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, ".config", botConfigDir), nil
-}
-
-// dataDir returns the location for data files. Use the XDG_DATA_HOME
-// environment variable, or the fallback value of $HOME/.local/share if the variable
-// is not set. It also attempts to create dataDir, in case it does not exist.
-func dataDir() (string, error) {
-	xdg := os.Getenv("XDG_DATA_HOME")
-
-	if xdg != "" {
-		dir := filepath.Join(xdg, botConfigDir)
-		return dir, os.MkdirAll(dir, 0755)
-	}
-
-	home, err := homeDir()
-	if err != nil {
-		return "", err
-	}
-	dir := filepath.Join(home, ".local", "share", botConfigDir)
-	return dir, os.MkdirAll(dir, 0755)
 }
