@@ -18,9 +18,7 @@ const (
 	timeFormat = "2006-01-02 15:04:05 MST"
 )
 
-// tgbotInterface defines an interface between this bot and the telegram API.
-type tgbotInterface interface {
-	GetUpdatesChan(tgbotapi.UpdateConfig) (tgbotapi.UpdatesChannel, error)
+type tgbotSender interface {
 	Send(tgbotapi.Chattable) (tgbotapi.Message, error)
 }
 
@@ -33,12 +31,9 @@ type redditClientInterface interface {
 type botSleepTime map[int64]time.Time
 
 // run is the main message dispatcher for the bot.
-func run(bot tgbotInterface, rclient redditClientInterface, triggers TriggerConfig) {
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
+func run(bot tgbotSender, updates tgbotapi.UpdatesChannel, rclient redditClientInterface, triggers TriggerConfig) {
 	bsleep := botSleepTime{}
 
-	updates, _ := bot.GetUpdatesChan(u)
 	for update := range updates {
 		if update.Message == nil || update.Message.From.IsBot {
 			continue
@@ -82,7 +77,7 @@ func sleeping(bsleep botSleepTime, id int64) bool {
 
 // handleTriggers checks if the message is a trigger message and emits a picture
 // from the configured subreddit if so.
-func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditClientInterface, triggers TriggerConfig) {
+func handleTriggers(bot tgbotSender, update tgbotapi.Update, rclient redditClientInterface, triggers TriggerConfig) {
 	msg := update.Message.Text
 
 	subreddit, ok, err := checkTriggers(msg, triggers)
@@ -131,7 +126,7 @@ func handleTriggers(bot tgbotInterface, update tgbotapi.Update, rclient redditCl
 // identified by chatID using NewPhotoUpload. This is the ideal way to
 // send URLs that point directly to images, which will immediately show
 // in the group.
-func sendImageURL(bot tgbotInterface, chatID int64, mediaURL string) error {
+func sendImageURL(bot tgbotSender, chatID int64, mediaURL string) error {
 	// Issue #74 is at play here, preventing us to upload via url.URL:
 	// https://github.com/go-telegram-bot-api/telegram-bot-api/issues/74
 	img := tgbotapi.NewPhotoUpload(chatID, nil)
@@ -147,7 +142,7 @@ func sendImageURL(bot tgbotInterface, chatID int64, mediaURL string) error {
 }
 
 // sendURL sends the media URL as a regular message to the user/group.
-func sendURL(bot tgbotInterface, chatID int64, mediaURL string) error {
+func sendURL(bot tgbotSender, chatID int64, mediaURL string) error {
 	msg := tgbotapi.NewMessage(chatID, mediaURL)
 
 	log.Printf("Sending URL: %v\n", msg)
@@ -162,7 +157,7 @@ func sendURL(bot tgbotInterface, chatID int64, mediaURL string) error {
 // sendFileURL sends the media URL that points to a Telegram playable file
 // (usually an MP4 video) using NewDocumentUpload. Use sendPhoto instead if
 // the URL points directly to an image.
-func sendFileURL(bot tgbotInterface, chatID int64, mediaURL string) error {
+func sendFileURL(bot tgbotSender, chatID int64, mediaURL string) error {
 	doc := tgbotapi.NewDocumentUpload(chatID, nil)
 	doc.FileID = mediaURL
 	doc.UseExisting = true

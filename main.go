@@ -24,5 +24,10 @@ func main() {
 	// run bot (this should never exit).
 	bot.Debug = true
 	log.Printf("Authorized on account %s", bot.Self.UserName)
-	run(bot, rclient, config.triggerConfig)
+
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+	updates, _ := bot.GetUpdatesChan(u)
+
+	run(bot, updates, rclient, config.triggerConfig)
 }
