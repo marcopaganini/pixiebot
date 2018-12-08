@@ -78,6 +78,24 @@ func sleeping(bsleep botSleepTime, id int64) bool {
 // handleTriggers checks if the message is a trigger message and emits a picture
 // from the configured subreddit if so.
 func handleTriggers(bot tgbotSender, update tgbotapi.Update, rclient redditClientInterface, triggers TriggerConfig) {
+	handlers := map[int]func(tgbotSender, int64, string) error{
+		// MediaNone: Nothing to do...
+		reddit.MediaNone: nil,
+
+		// MediaImageURL: The URL points to an image, so we can upload a
+		// picture directly.
+		reddit.MediaImageURL: sendImageURL,
+
+		// MediaFileURL: The URL points to a file (typically an MP4 file, but
+		// any type playable by Telegram. In this case, we send the URL as a
+		// document.  upload.
+		reddit.MediaFileURL: sendFileURL,
+
+		// Video URL: Simple video url, like youtube. Telegram takes charge of
+		// reading the link and generating a thumbnail.
+		reddit.MediaVideoURL: sendURL,
+	}
+
 	msg := update.Message.Text
 
 	subreddit, ok, err := checkTriggers(msg, triggers)
@@ -90,35 +108,20 @@ func handleTriggers(bot tgbotSender, update tgbotapi.Update, rclient redditClien
 	}
 	log.Printf("Triggering fetch on %s", subreddit)
 
+	// Dispatch handler using mediaType as key in handlers.
 	mediaURL, mediaType, err := rclient.RandomMediaURL(subreddit)
 	if err != nil {
 		log.Printf("%v", err)
 		return
 	}
-	switch mediaType {
-	// Nothing to send
-	case reddit.MediaNone:
+	handler, ok := handlers[mediaType]
+	if !ok {
 		log.Printf("Media URL is empty. Silently ignoring.")
+		return
+	}
 
-	// MediaImageURL: The URL points to an image, so we can upload a
-	// picture directly.
-	case reddit.MediaImageURL:
-		if err := sendImageURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
-			log.Print(err)
-		}
-	// MediaFileURL: The URL points to a file (typically an MP4 file, but any
-	// type playable by Telegram. In this case, we send the URL as a document.
-	// upload.
-	case reddit.MediaFileURL:
-		if err := sendFileURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
-			log.Print(err)
-		}
-	// Video URL: Simple video url, like youtube. Telegram takes charge of
-	// reading the link and generating a thumbnail.
-	case reddit.MediaVideoURL:
-		if err := sendURL(bot, update.Message.Chat.ID, mediaURL); err != nil {
-			log.Print(err)
-		}
+	if err := handler(bot, update.Message.Chat.ID, mediaURL); err != nil {
+		log.Print(err)
 	}
 }
 

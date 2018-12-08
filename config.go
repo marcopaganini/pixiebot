@@ -72,7 +72,7 @@ func loadConfig() (botConfig, error) {
 	if err != nil {
 		return botConfig{}, err
 	}
-	if _, err := toml.Decode(string(buf), &config); err != nil {
+	if _, err = toml.Decode(string(buf), &config); err != nil {
 		return botConfig{}, err
 	}
 
@@ -81,22 +81,31 @@ func loadConfig() (botConfig, error) {
 		return botConfig{}, errors.New("usename/password/client_id/secret cannot be null")
 	}
 
-	// Generate triggerConfig.
+	tc, err := buildTriggerConfig(config)
+	if err != nil {
+		return botConfig{}, err
+	}
+
+	config.triggerConfig = tc
+
+	return config, nil
+}
+
+// buildTriggerConfig builds a trigger configuration based on the loaded config.
+func buildTriggerConfig(config botConfig) (TriggerConfig, error) {
 	// First, fetch every key and order. We want keys to be processed in sequence.
 	var keys []string
-
 	for k := range config.TOMLTriggerConfig {
 		keys = append(keys, k)
 	}
 
-	// Now add multiple trigger configs in key order.
 	tc := TriggerConfig{}
 	for _, k := range keys {
 		fileRule := config.TOMLTriggerConfig[k]
 
 		// Check percentage.
 		if fileRule.Percentage < 0 || fileRule.Percentage > 100 {
-			return botConfig{}, fmt.Errorf("trigger percentage must be between 0 and 100, got %d", fileRule.Percentage)
+			return TriggerConfig{}, fmt.Errorf("trigger percentage must be between 0 and 100, got %d", fileRule.Percentage)
 		}
 
 		tr := TriggerRule{}
@@ -107,13 +116,12 @@ func loadConfig() (botConfig, error) {
 		var err error
 		tr.regex, err = regexp.Compile(fileRule.Regex)
 		if err != nil {
-			return botConfig{}, fmt.Errorf("rule contains invalid regex: %q: %v", fileRule.Regex, err)
+			return TriggerConfig{}, fmt.Errorf("rule contains invalid regex: %q: %v", fileRule.Regex, err)
 		}
 		tc = append(tc, tr)
 	}
-	config.triggerConfig = tc
 
-	return config, nil
+	return tc, nil
 }
 
 // homeDir returns the user's home directory or an error if the variable HOME
